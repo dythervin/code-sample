@@ -1,0 +1,23 @@
+{
+    "name": "Dythervin.PathfindingExt",
+    "rootNamespace": "",
+    "references": [
+        "GUID:7afb353a1daa88e4797d2da07d684a54",
+        "GUID:b1a4a8cafa6a5274d8b627054dcdbadf",
+        "GUID:efa45043feb7e4147a305b73b5cea642",
+        "GUID:3899ac7c2607eb74a9371ea2e9481667",
+        "GUID:32510d4f1fd44940bdc95cd3f0f90536",
+        "GUID:0d2722be3221441990b3d439a49d3d00",
+        "GUID:d8b63aba1907145bea998dd612889d6b",
+        "GUID:0d8beb7f090555447a6cf5ce9e54dbb4"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

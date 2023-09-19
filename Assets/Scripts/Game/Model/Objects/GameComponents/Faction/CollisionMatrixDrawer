@@ -1,0 +1,203 @@
+﻿#if UNITY_EDITOR
+using Dythervin.Core.Editor;
+using Dythervin.Core.Extensions;
+using System;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEngine;
+using Object = UnityEngine.Object;
+
+
+namespace Game
+{
+    [CustomPropertyDrawer(typeof(ICollisionMatrix))]
+    public class CollisionMatrixDrawer : PropertyDrawer
+    {
+        private const string WrappedArraysName = "value";
+
+        private static float LineHeight => EditorGUIUtility.singleLineHeight;
+
+        private const float FirstLineMargin = 5f;
+        private const float LastLineMargin = 2f;
+        private static readonly Vector2 CellSpacing = new Vector2(5f, 5f);
+        private SerializedProperty _thisProperty;
+        private SerializedProperty _wrapperArrayProperty;
+        private Func<SerializedProperty, object> _setter;
+        private Func<object> _getter;
+        private Vector2Int _cellSize;
+        private Type _elementType;
+
+
+
+#region Texts
+
+        static class Texts
+        {
+            public static readonly GUIContent Reset = new GUIContent("Reset");
+            public static readonly GUIContent ChangeCellSize = new GUIContent("Change Cell Size");
+            public const string CellSizeLabel = "Cell Size";
+        }
+
+#endregion
+
+
+
+#region Abstract and virtual methods
+
+        protected virtual Vector2Int GetDefaultCellSizeValue() => new Vector2Int(32, 16);
+
+        public int AxisElementCount { get; private set; }
+
+#endregion
+
+
+
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        {
+            _thisProperty = property;
+            Init(property);
+            _cellSize = GetDefaultCellSizeValue();
+
+            _matrix.GetType().TryGetBaseGeneric(out _elementType);
+            _elementType = _elementType.GenericTypeArguments[0];
+
+            position = EditorGUI.IndentedRect(position);
+
+            // Begin property drawing
+            EditorGUI.BeginProperty(position, label, property);
+
+            // Display foldout
+            Rect foldoutRect = new Rect(position) { height = LineHeight };
+
+            // We're using EditorGUI.IndentedRect to draw our Rects, and it already takes the indentLevel into account, so we must set it to 0.
+            // This allows the PropertyDrawer to handle nested variables correctly.
+            // More info: https://answers.unity.com/questions/1268850/how-to-properly-deal-with-editorguiindentlevel-in.html
+            EditorGUI.indentLevel = 0;
+
+            //label.tooltip = $"Size: {gridSizeProperty.vector2IntValue.x}x{gridSizeProperty.vector2IntValue.y}";
+
+            property.isExpanded = EditorGUI.BeginFoldoutHeaderGroup(foldoutRect, property.isExpanded, label,
+                menuAction: ShowHeaderContextMenu);
+            EditorGUI.EndFoldoutHeaderGroup();
+
+            // Go to next line
+            position.y += LineHeight;
+
+            if (property.isExpanded)
+            {
+                position.y += FirstLineMargin;
+
+                DisplayGrid(position);
+            }
+
+            EditorGUI.EndProperty();
+        }
+
+        private void Init(SerializedProperty property)
+        {
+            _wrapperArrayProperty = property.FindPropertyRelative(WrappedArraysName);
+            AxisElementCount =  _wrapperArrayProperty.arraySize;
+        }
+
+        private void ShowHeaderContextMenu(Rect position)
+        {
+            GenericMenu menu = new GenericMenu();
+            menu.AddItem(Texts.Reset, false, OnReset);
+            menu.AddSeparator(""); // An empty string will create a separator at the top level
+            // menu.AddItem(Texts.ChangeCellSize, false, OnChangeCellSize);
+            menu.DropDown(position);
+        }
+
+        private void OnReset()
+        {
+            for (int a = 0; a < AxisElementCount; a++)
+            {
+                int to = AxisElementCount - a;
+                for (int i = 0; i < to; i++)
+                {
+                    _matrix.SetItem(a, i, default);
+                    _wrapperArrayProperty.
+                }
+            }
+        }
+
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        {
+            float height = base.GetPropertyHeight(property, label);
+
+            if (property.isExpanded)
+            {
+                GetMatrix(property);
+                height += FirstLineMargin;
+
+                height += AxisElementCount * (AxisElementCount + CellSpacing.y) - CellSpacing.y; // Cells lines
+
+                height += LastLineMargin;
+            }
+
+            return height;
+        }
+
+        private void DisplayGrid(Rect position)
+        {
+            Rect cellRect = new Rect(position.x, position.y, AxisElementCount, AxisElementCount);
+
+            for (int a = 0; a < AxisElementCount; a++)
+            {
+                int to = AxisElementCount - a;
+                for (int i = a + 1; i < to; i++)
+                {
+                    Rect pos = new Rect(cellRect)
+                    {
+                        x = cellRect.x + (cellRect.width + CellSpacing.x) * i, y = cellRect.y + (cellRect.height + CellSpacing.y) * a
+                    };
+
+                    SerializedProperty property = GetRowAt(a).GetArrayElementAtIndex(i);
+
+                    if (_elementType.Implements(typeof(Object)))
+                    {
+                        Match match = Regex.Match(_elementType.Name, @"PPtr<\$(.+)>");
+                        if (match.Success)
+                        {
+                            string objectType = match.Groups[1].ToString();
+                            string assemblyName = "UnityEngine";
+                            EditorGUI.ObjectField(pos, property, System.Type.GetType($"{assemblyName}.{objectType}, {assemblyName}"),
+                                GUIContent.none);
+                        }
+                    }
+                    else
+                    {
+                        EditorGUI.PropertyField(pos, property, GUIContent.none);
+                    }
+                }
+            }
+        }
+
+        private SerializedProperty GetRowAt(int idx)
+        {
+            return _thisProperty.GetArrayElementAtIndex(idx).FindPropertyRelative("array");
+        }
+
+
+
+#region Debug
+
+        private void DrawDebugRect(Rect rect) => DrawDebugRect(rect, new Color(1f, 0f, 1f, .2f));
+
+        private void DrawDebugRect(Rect rect, Color color)
+        {
+            Texture2D texture = new Texture2D(1, 1);
+            texture.SetPixel(0, 0, color);
+            texture.Apply();
+            Texture2D prevBoxTex = GUI.skin.box.normal.background;
+            GUI.skin.box.normal.background = texture;
+            GUI.Box(rect, GUIContent.none);
+            GUI.skin.box.normal.background = prevBoxTex;
+        }
+
+#endregion
+    }
+}
+
+
+#endif
